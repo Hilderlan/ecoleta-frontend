@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useHistory } from 'react-router-dom';
 import { FiArrowLeft } from 'react-icons/fi'
 import { Map, TileLayer, Marker } from 'react-leaflet';
 import logo from '../../assets/logo.svg';
@@ -9,10 +9,22 @@ import './styles.css';
 
 const CreatePoint = () => {
   const [itens, setItens] = useState([]);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    whatsapp: ''
+  });
+
   const [ufs, setUfs] = useState([]);
   const [cities, setCities] = useState([]);
   const [selectedUf, setSelectedUf] = useState('0');
   const [selectedCity, setSelectedCity] = useState('0');
+  const [selectedItems, setSelectedItems] = useState([]);
+
+  const [selectedPosition, setSelectedPosition] = useState([0, 0]);
+  // const [initialPosition, setInitialPosition] = useState([]);
+
+  const history = useHistory();
 
   useEffect(() =>{
     api.get('items').then(response => {
@@ -41,6 +53,13 @@ const CreatePoint = () => {
       });
   }, [selectedUf]);
 
+  // useEffect(() => {
+  //   navigator.geolocation.getCurrentPosition(position => {
+  //     const { latitude, longitude } = position.coords;
+  //     setInitialPosition(latitude, longitude);
+  //   });
+  // }, []);
+
   function handleSelectUf(e){
     const uf = e.target.value;
     
@@ -51,6 +70,54 @@ const CreatePoint = () => {
     const city = e.target.value;
 
     setSelectedCity(city);
+  }
+
+  function handleMapClick(e){    
+    const { lat, lng } = e.latlng;
+    setSelectedPosition([lat, lng])
+  }
+
+  function handleFormData(e) {
+    const { name, value } = e.target;
+
+    setFormData({...formData, [name]:value });
+  }
+
+  function handleItemClick(id) {
+    const alreadyInclude = selectedItems.findIndex(item => item === id);
+
+    if(alreadyInclude >= 0) {
+      const itemsFiltered = selectedItems.filter(item => item !== id);
+
+      setSelectedItems(itemsFiltered);
+    }
+    else {
+      setSelectedItems([...selectedItems, id ]);
+    }
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+
+    const { name, email, whatsapp } = formData;
+    const uf = selectedUf;
+    const city = selectedCity;
+    const [latitude, longitude] = selectedPosition;
+    const items = selectedItems;
+
+    const data = {
+      name,
+      email,
+      whatsapp,
+      uf,
+      city,
+      latitude,
+      longitude,
+      items
+    }
+
+    api.post('points', data)
+    history.push('/');
   }
 
   return(
@@ -64,7 +131,7 @@ const CreatePoint = () => {
         </Link>
       </header>
 
-      <form>
+      <form onSubmit={ handleSubmit }>
         <h1>Cadastro do <br /> ponto de coleta</h1>
 
         <fieldset>
@@ -74,18 +141,18 @@ const CreatePoint = () => {
 
           <div className="field">
             <label htmlFor="name">Nome da entidade</label>
-            <input type="text" name="name" id="name"/>
+            <input type="text" name="name" id="name" value={ formData.name } onChange={ handleFormData } />
           </div>
 
           <div className="field-group">
             <div className="field">
               <label htmlFor="email">E-mail</label>
-              <input type="email" name="email" id="email"/>
+              <input type="email" name="email" id="email" value={ formData.email } onChange={ handleFormData } />
             </div>
 
             <div className="field">
               <label htmlFor="whatsapp">Whatsapp</label>
-              <input type="text" name="whatsapp" id="whatsapp"/>
+              <input type="text" name="whatsapp" id="whatsapp" value={ formData.whatsapp } onChange={ handleFormData } />
             </div>
           </div>
         </fieldset>
@@ -96,9 +163,9 @@ const CreatePoint = () => {
             <span>Selecione o endereço no mapa</span>
           </legend>
 
-          <Map center={[-5.0328144, -42.8150323]} zoom={15}>
+          <Map center={[-5.0328144, -42.8150323]} zoom={15} onClick={ handleMapClick }>
             <TileLayer attribution="&amp;copy; <a href='https://www.openstreetmap.org/'>OpenStreetMap</a> contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <Marker position={[-5.0328144, -42.8150323]} />
+            <Marker position={selectedPosition} />
           </Map>
 
           <div className="field-group">
@@ -132,7 +199,7 @@ const CreatePoint = () => {
 
           <ul className="items-grid">
             { itens.map(item => (
-              <li key={item.id}>
+              <li key={item.id} onClick={ () => handleItemClick(item.id) } className={ selectedItems.includes(item.id) ? 'selected' : '' } >
                 <img src={ item.image_url } alt= { item.title } />
                 <span> { item.title } </span>
               </li>
